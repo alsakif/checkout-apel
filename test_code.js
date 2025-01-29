@@ -6,13 +6,29 @@ puppeteer.use(StealthPlugin());
 
 const url_16 = "https://www.apple.com/shop/buy-iphone/iphone-16-pro";
 
+
+// Helper function for simple clicks
+async function clickSimple(page, selector, options = {}) {
+  await page.waitForSelector(selector, options);
+  await page.click(selector);
+}
+
+// Helper function for complex clicks (evaluate or custom actions)
+async function clickComplex(page, selector, options = {}, action = null) {
+  await page.waitForSelector(selector, options);
+  if (action) {
+    await action();
+  } else {
+    await page.evaluate((s) => document.querySelector(s).click(), selector);
+  }
+}
+
 async function givePage() {
   const browser = await puppeteer.launch({
     headless: false,
-    executablePath: puppeteer.executablePath() // Use Puppeteer's built-in executable
+    executablePath: puppeteer.executablePath()
   });
-  let page = await browser.newPage();
-  return page;
+  return await browser.newPage();
 }
 
 async function run() {
@@ -23,87 +39,59 @@ async function run() {
   await billingOptions(page);
 }
 
-
 async function addToCart(page) {
-
-  await page.waitForNetworkIdle({ idleTime: 500 }); // settle the network
-  await new Promise(resolve => setTimeout(resolve, 2000));// wait for 3 seconds
-
-  selector = "input[data-autom='dimensionScreensize6_3inch']"
-  await page.waitForSelector(selector, { visible: true, timeout: 3000 });
-  await page.click(selector);
-
-  selector = "input[data-autom='dimensionColorblacktitanium']"
-  await page.waitForSelector(selector, { visible: true, timeout: 3000 });
-  await page.evaluate((s) => document.querySelector(s).click(), selector);
-
-  selector = "input[data-autom='dimensionCapacity128gb']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
-
-  selector = "input[data-autom='choose-noTradeIn']"
-  await page.waitForSelector(selector, { visible: true });
-  await page.click(selector);
   await page.waitForNetworkIdle({ idleTime: 500 });
+  await new Promise(resolve => setTimeout(resolve, 2000));
 
-  selector = "input[data-autom='purchaseGroupOptionfullprice']";
-  await page.waitForSelector(selector, { visible: true });
-  await page.click(selector);
-  await page.waitForNetworkIdle({ idleTime: 500 });
+  // Screen size
+  await clickSimple(page, "input[data-autom='dimensionScreensize6_3inch']", { visible: true, timeout: 3000 });
+  
+  // Color (uses evaluate click)
+  await clickComplex(page, "input[data-autom='dimensionColorblacktitanium']", { visible: true, timeout: 3000 });
+  
+  // Capacity
+  await clickSimple(page, "input[data-autom='dimensionCapacity128gb']", {});
+  
+  // Trade-in option
+  await clickSimple(page, "input[data-autom='choose-noTradeIn']", { visible: true });
+  await page.waitForNetworkIdle({ idleTime: 1000 });
+  
+  // Purchase option
+  await clickSimple(page, "input[data-autom='purchaseGroupOptionfullprice']", { visible: true });
+  await page.waitForNetworkIdle({ idleTime: 1000 });
+  
+  // Carrier
+  await clickSimple(page, "input[data-autom='carrierModelUNLOCKED/US']", { visible: true });
+  await page.waitForNetworkIdle({ idleTime: 1000 });
+  
+  // AppleCare
+  await clickSimple(page, "input[data-autom='applecareplus_58_noapplecare']", { visible: true });
+  
+  await page.waitForNetworkIdle({ idleTime: 1000 });
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  await clickSimple(page, "button[data-autom='add-to-cart']", { visible: true });
 
-  selector = "input[data-autom='carrierModelUNLOCKED/US']"
-  await page.waitForSelector(selector, { visible: true });
-  await page.click(selector);
-  await page.waitForNetworkIdle({ idleTime: 500 });
-
-  selector = "input[data-autom='applecareplus_58_noapplecare']";
-  await page.waitForSelector(selector, { visible: true });
-  await page.click(selector);
-
-  await page.waitForNetworkIdle({ idleTime: 500 }); // check if the network is setteled for 0.5 seconds
-  await new Promise(resolve => setTimeout(resolve, 3000));// wait for 1 seconds
-
-
-  selector = "button[data-autom='add-to-cart']";
-  await page.waitForSelector(selector, { visible: true, timeout: 3000 });
-  await page.click(selector);
 }
 
 async function shipping(page) {
-  
-  selector = "button[data-autom='proceed']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
+  await clickSimple(page, "button[data-autom='proceed']", {});
+  await clickSimple(page, "button[data-autom='checkout']", {});
+  await clickSimple(page, "button[data-autom='guest-checkout-btn']", {});
 
-  selector = "button[data-autom='checkout']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
-
-  selector = "button[data-autom='guest-checkout-btn']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
-
-  selector = "button[role='radio']"
-  await page.waitForSelector(selector);
-  await page.evaluate(() => {
-    const buttons = document.querySelectorAll('button[role="radio"]');
-    if (buttons[0]) buttons[0].click();
+  // Radio button selection (custom action)
+  await clickComplex(page, "button[role='radio']", {}, async () => {
+    await page.evaluate(() => {
+      const buttons = document.querySelectorAll('button[role="radio"]');
+      if (buttons[0]) buttons[0].click();
+    });
   });
 
-  selector = "input[id='checkout.fulfillment.deliveryTab.delivery.deliveryLocation.address.postalCode']"
-  await page.waitForSelector(selector);
-  await page.type(selector,'20740')
+  // Zip code
+  await page.type("input[id='checkout.fulfillment.deliveryTab.delivery.deliveryLocation.address.postalCode']", '20740');
+  await clickSimple(page, "button[data-autom='checkout-zipcode-apply']", {});
+  await clickSimple(page, "button[data-autom='fulfillment-continue-button']", {});
 
-  selector = "button[data-autom='checkout-zipcode-apply']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
-
-  selector = "button[data-autom='fulfillment-continue-button']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
-
-  
-  
+  // Address form
   selector = "input[id='checkout.shipping.addressSelector.newAddress.address.firstName']"
   await page.waitForSelector(selector);
   await page.type(selector, "Saqif");
@@ -121,49 +109,32 @@ async function shipping(page) {
   await page.type("input[name='fullDaytimePhone']", '4437655722');
   await page.waitForNetworkIdle({ idleTime: 500 });
 
-  selector = "button[data-autom='shipping-continue-button']";
-  await page.click(selector);
-  await page.waitForNetworkIdle({ idleTime: 1500 });
+  // Shipping continue button
+  await clickSimple(page, "button[data-autom='shipping-continue-button']", { 
+    visible: true,
+    timeout: 10000  // Increased timeout
+  });
 
-  selector = "button[data-autom='use-Existing-address']";
-  await page.evaluate((s) => document.querySelector(s).click(), selector);
+  // Existing address selection
+  await clickComplex(page, "button[data-autom='use-Existing-address']")
 }
-
 
 async function billingOptions(page) {
-  selector = "input[data-autom='checkout-billingOptions-CREDIT']"
-  await page.waitForSelector(selector);
-  await page.click(selector);
+  await clickSimple(page, "input[data-autom='checkout-billingOptions-CREDIT']", {});
   await page.waitForNetworkIdle({ idleTime: 1500 });
 
-  selector = "input[data-autom='card-number-input']"
-  await page.waitForSelector(selector);
-  await page.type (selector, '5440401009535383');
+  await page.type("input[data-autom='card-number-input']", '5582154002178614');
+  await page.type("input[data-autom='expiration-input']", '10/26');
+  await page.type("input[data-autom='security-code-input']", '206');
 
-  selector = "input[data-autom='expiration-input']"
-  await page.waitForSelector(selector);
-  await page.type (selector, '05/25');
-
-  selector = "input[data-autom='security-code-input']"
-  await page.waitForSelector(selector);
-  await page.type (selector, '826');
-
-  // Click the first continue button
-  const firstButtonSelector = "button[data-autom='continue-button-label']";
-  await page.waitForSelector(firstButtonSelector);
-  await page.click(firstButtonSelector);
-  
-  // Wait for navigation to complete
+  // First continue button
+  await clickSimple(page, "button[data-autom='continue-button-label']", {});
   await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  
-  // Wait for the second button to be visible and clickable
-  const secondButtonSelector = "button[data-autom='continue-button-label']";
-  await page.waitForSelector(secondButtonSelector, { visible: true });
-  
   await page.waitForNetworkIdle({ idleTime: 1500 });
-  await page.click(secondButtonSelector);
+  
+  // Second continue button
+  await clickSimple(page, "button[data-autom='continue-button-label']", { visible: true });
   
 }
-
 
 run().catch(err => console.error(err));
