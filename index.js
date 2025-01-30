@@ -27,7 +27,7 @@ async function clickSimple(page, selector, options = {}, description = '', maxRe
     } catch (err) {
       if (attempt === maxRetries) {
         logStep(`CRITICAL FAILURE: ${description}`, '⚠️');
-        await page.screenshot({ path: `error_${Date.now()}_${description.replace(/ /g, '_')}.png` });
+        //await page.screenshot({ path: `error_${Date.now()}_${description.replace(/ /g, '_')}.png` });
         throw new Error(`Failed after ${maxRetries} attempts: ${err.message}`);
       }
       logStep(`Retrying (${err.message.split('\n')[0]})`, '↩️');
@@ -60,7 +60,7 @@ async function clickComplex(page, selector, options = {}, action = null, descrip
     } catch (err) {
       if (attempt === maxRetries) {
         logStep(`COMPLEX FAILURE: ${description}`, '⚠️');
-        await page.screenshot({ path: `complex_error_${Date.now()}.png` });
+        //await page.screenshot({ path: `complex_error_${Date.now()}.png` });
         throw err;
       }
       logStep(`Complex Retry (${err.message.split(':')[0]})`, '↩️');
@@ -201,9 +201,9 @@ async function billingOptions(page) {
     );
     await page.waitForNetworkIdle({ idleTime: 500 });
 
-    await page.type("input[data-autom='card-number-input']", '5406005505783124');
-    await page.type("input[data-autom='expiration-input']", '02/26');
-    await page.type("input[data-autom='security-code-input']", '577');
+    await page.type("input[data-autom='card-number-input']", '5159544495667615');
+    await page.type("input[data-autom='expiration-input']", '12/29');
+    await page.type("input[data-autom='security-code-input']", '299');
 
     await clickSimple(page, "button[data-autom='continue-button-label']", 
       { visible: true }, 
@@ -243,7 +243,7 @@ async function billingOptions(page) {
     
     if (!successIndicator) {
       logStep('Unknown payment status - neither error nor success detected', '⚠️');
-      await page.screenshot({ path: `ambiguous_status_${Date.now()}.png` });
+      //await page.screenshot({ path: `ambiguous_status_${Date.now()}.png` });
     }
   }
 
@@ -269,7 +269,7 @@ async function billingOptions(page) {
 
 } catch (err) {
   logStep(`Payment processing error: ${err.message}`, '💀');
-  await page.screenshot({ path: `payment_failure_${Date.now()}.png` });
+  //await page.screenshot({ path: `payment_failure_${Date.now()}.png` });
   throw err;
 }
 }
