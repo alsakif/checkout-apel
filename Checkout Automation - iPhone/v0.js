@@ -69,7 +69,47 @@ async function clickComplex(page, selector, options = {}, action = null, descrip
     }
   }
 }
+async function typeWithRetry(page, selector, text, description = '', maxRetries = 3) {
+  let attempt = 1;
+  while (attempt <= maxRetries) {
+    try {
+      logStep(`Input Attempt ${attempt}/${maxRetries}: ${description}`, '⌨️');
+      
+      // 1. Wait for element stability
+      await page.waitForSelector(selector, {
+        visible: true,
+        enabled: true,
+        timeout: 5000
+      });
 
+      // 2. Focus and clear existing value
+      await page.click(selector, { clickCount: 3, delay: 100 });
+      await page.keyboard.press('Backspace');
+      await page.evaluate(selector => {
+        document.querySelector(selector).value = '';
+      }, selector);
+
+      // 3. Type with human-like delays
+      await page.type(selector, text, { delay: Math.random() * 50 + 50 });
+
+      // 4. Verify input
+      const enteredValue = await page.$eval(selector, el => el.value.replace(/\s/g, ''));
+      if (enteredValue !== text.replace(/\s/g, '')) {
+        throw new Error(`Value mismatch: ${enteredValue} vs ${text}`);
+      }
+
+      logStep(`Input Success: ${description}`, '✅');
+      return;
+    } catch (err) {
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to input ${description} after ${maxRetries} attempts`);
+      }
+      
+      await page.waitForTimeout(1000 * attempt);
+      attempt++;
+    }
+  }
+}
 // ================== CORE FUNCTIONS ==================
 async function addToCart(page) {
   try {
@@ -193,22 +233,44 @@ async function shipping(page) {
 
 async function billingOptions(page) {
   try {
-    logStep('Starting payment process', '💳');
-    
-    await clickSimple(page, "input[data-autom='checkout-billingOptions-CREDIT']", 
-      {}, 
-      'Credit Card Option'
-    );
-    await page.waitForNetworkIdle({ idleTime: 500 });
+   // Select credit card option
+   await clickSimple(page, "input[data-autom='checkout-billingOptions-CREDIT']", 
+    { visible: true, timeout: 10000 }, 
+    'Credit Card Option'
+  );
 
-    await page.type("input[data-autom='card-number-input']", '5159544495667615');
-    await page.type("input[data-autom='expiration-input']", '12/29');
-    await page.type("input[data-autom='security-code-input']", '299');
+  // Wait for credit card form to load
+  await page.waitForSelector("input[data-autom='card-number-input']", {
+    visible: true,
+    timeout: 15000
+  });
 
-    await clickSimple(page, "button[data-autom='continue-button-label']", 
-      { visible: true }, 
-      'First Continue'
-    );
+  // Card number with retries
+  await typeWithRetry(page, 
+    "input[data-autom='card-number-input']", 
+    '5389082167399821',
+    'Card Number Input'
+  );
+
+  // Expiration date with retries
+  await typeWithRetry(page,
+    "input[data-autom='expiration-input']",
+    '10/25',
+    'Expiration Date Input'
+  );
+
+  // CVV with retries
+  await typeWithRetry(page,
+    "input[data-autom='security-code-input']",
+    '838',
+    'CVV Input'
+  );
+
+  // Continue button
+  await clickSimple(page, "button[data-autom='continue-button-label']", 
+    { visible: true, timeout: 15000 }, 
+    'First Continue'
+  );
 
     await page.waitForNavigation({ waitUntil: 'networkidle0' });
     await page.waitForNetworkIdle({ idleTime: 1500 });
@@ -251,7 +313,7 @@ async function billingOptions(page) {
     const errorText = await page.evaluate(() => {
       const el = document.querySelector('.rt-messages-text');
       return el ? el.innerText.trim() : 'Payment failed (error message not found)';
-    });
+  });
     
     // Visual feedback for error
     await page.evaluate((selector) => {

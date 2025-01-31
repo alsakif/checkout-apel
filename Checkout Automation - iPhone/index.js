@@ -1,31 +1,31 @@
-const { readData, writeData, clearData } = require('./dataHandler');
-const { getCreditCardInfo, getMainChoice, getDeletionChoice } = require('./prompts');
-const { run } = require('./checkoutFlow');
+const { loadPaymentData, savePaymentData, clearPaymentData } = require('./src/data/dataHandler');
+const { getPaymentData } = require('./src/cli/prompts');
+const { runWithRetries } = require('./src/core/checkoutProcess');
+const inquirer = require('inquirer');
+
 
 async function main() {
-  let paymentData = readData();
-  
-  if (paymentData) {
-    const { action } = await getMainChoice();
-    if (action === 'new') {
-      paymentData = await getCreditCardInfo();
-      writeData(paymentData);
-    }
-  } else {
-    paymentData = await getCreditCardInfo();
-    writeData(paymentData);
-  }
-
   try {
-    await run(paymentData);
+    let paymentData = loadPaymentData();
     
-    const { shouldDelete } = await getDeletionChoice();
-    if (shouldDelete) {
-      clearData();
-      console.log('🗑  Payment data cleared successfully');
+    if (!paymentData) {
+      paymentData = await getPaymentData();
+      savePaymentData(paymentData);
     }
+
+    await runWithRetries(paymentData);
+
+    const { confirmClear } = await inquirer.prompt({
+      type: 'confirm',
+      name: 'confirmClear',
+      message: 'Clear stored payment data?',
+      default: true
+    });
+
+    if (confirmClear) clearPaymentData();
+
   } catch (error) {
-    console.error('❌ Checkout failed:', error.message);
+    console.error('❌ Final checkout failure:', error.message);
     process.exit(1);
   }
 }
